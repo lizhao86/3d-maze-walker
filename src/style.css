@@ -127,8 +127,8 @@ body {
 
 .minimap {
   display: block;
-  width: 132px;
-  height: 132px;
+  width: 198px;
+  height: 198px;
 }
 
 .crosshair {
@@ -239,12 +239,26 @@ body {
 }
 
 .slot-icon {
-  display: grid;
-  height: 100%;
-  place-items: center;
-  color: var(--slot-color);
-  font-size: 13px;
-  font-weight: 900;
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 46px;
+  height: 30px;
+  background-image: var(--slot-image);
+  background-repeat: no-repeat;
+  background-position: var(--slot-position, center);
+  background-size: var(--slot-size, contain);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--slot-color) 72%, transparent));
+  transform: translateX(-50%);
+}
+
+.slot-label {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  color: color-mix(in srgb, var(--slot-color) 82%, white);
+  font-size: 9px;
+  font-weight: 950;
 }
 
 .prompt {
@@ -362,7 +376,13 @@ body {
   }
 
   .slot-icon {
-    font-size: 10px;
+    top: 8px;
+    width: 34px;
+    height: 24px;
+  }
+
+  .slot-label {
+    font-size: 8px;
   }
 
   .weapon-panel {

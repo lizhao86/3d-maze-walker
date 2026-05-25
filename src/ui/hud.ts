@@ -1,6 +1,7 @@
 import type { GameState } from "../simulation/types";
 import { WEAPONS } from "../simulation/weapons";
 import { REQUIRED_KEY_FRAGMENTS } from "../simulation/gameState";
+import { createWeaponIconStyle } from "../render/spriteArt";
 
 export type Hud = ReturnType<typeof createHud>;
 
@@ -20,7 +21,7 @@ export function createHud(container: HTMLElement, state: GameState) {
         <div class="objective-copy">Find key fragments and reach the exit.</div>
       </section>
       <section class="minimap-panel">
-        <canvas class="minimap" width="132" height="132"></canvas>
+        <canvas class="minimap" width="198" height="198"></canvas>
       </section>
       <div class="crosshair"><span></span><span></span></div>
       <section class="weapon-panel">
@@ -55,6 +56,10 @@ export function createHud(container: HTMLElement, state: GameState) {
     throw new Error("HUD failed to initialize.");
   }
 
+  const weaponIconStyles = new Map(
+    Object.keys(WEAPONS).map((weaponId) => [weaponId, createWeaponIconStyle(weaponId as keyof typeof WEAPONS)]),
+  );
+
   const api = {
     canvas,
     startOverlay,
@@ -83,9 +88,10 @@ export function createHud(container: HTMLElement, state: GameState) {
         .map((weaponId, index) => {
           const weapon = WEAPONS[weaponId];
           const selectedClass = weaponId === nextState.player.selectedWeapon ? " selected" : "";
-          return `<button class="slot${selectedClass}" data-slot="${index}" style="--slot-color:${weapon.color}">
+          return `<button class="slot${selectedClass}" data-slot="${index}" style="--slot-color:${weapon.color}; ${weaponIconStyles.get(weaponId)}">
             <span class="slot-number">${index + 1}</span>
-            <span class="slot-icon">${weapon.shortName}</span>
+            <span class="slot-icon" aria-label="${weapon.name}"></span>
+            <span class="slot-label">${weapon.shortName}</span>
           </button>`;
         })
         .join("");
@@ -109,6 +115,7 @@ function drawMinimap(canvas: HTMLCanvasElement, state: GameState): void {
 
   for (let y = 0; y < maze.height; y += 1) {
     for (let x = 0; x < maze.width; x += 1) {
+      if (!state.explored[y][x]) continue;
       context.fillStyle = maze.cells[y][x] === 1 ? "#293645" : "#07151d";
       context.fillRect(x * scale, y * scale, Math.ceil(scale), Math.ceil(scale));
     }
@@ -116,20 +123,30 @@ function drawMinimap(canvas: HTMLCanvasElement, state: GameState): void {
 
   context.fillStyle = "#ffb72f";
   for (const chest of state.chests) {
-    if (!chest.opened) {
+    if (!chest.opened && state.explored[chest.grid.y][chest.grid.x]) {
       context.fillRect(chest.grid.x * scale, chest.grid.y * scale, scale, scale);
     }
   }
 
   context.fillStyle = "#ff4fce";
   for (const monster of state.monsters) {
-    if (monster.alive) {
+    if (monster.alive && state.explored[monster.grid.y][monster.grid.x]) {
       context.fillRect(monster.grid.x * scale, monster.grid.y * scale, scale, scale);
     }
   }
 
-  context.fillStyle = "#51ffc8";
-  context.fillRect(maze.exit.x * scale, maze.exit.y * scale, scale * 1.5, scale * 1.5);
+  if (state.explored[maze.exit.y][maze.exit.x]) {
+    context.fillStyle = "#51ffc8";
+    context.fillRect(maze.exit.x * scale, maze.exit.y * scale, scale * 1.5, scale * 1.5);
+  }
+
+  context.fillStyle = "rgba(1, 4, 8, 0.94)";
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
+      if (state.explored[y][x]) continue;
+      context.fillRect(x * scale, y * scale, Math.ceil(scale), Math.ceil(scale));
+    }
+  }
 
   const playerGridX = state.player.position.x / 4 + maze.width / 2;
   const playerGridY = state.player.position.z / 4 + maze.height / 2;

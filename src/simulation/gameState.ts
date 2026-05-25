@@ -4,6 +4,7 @@ import { LOOT_WEAPONS } from "./weapons";
 
 export const CELL_SIZE = 4;
 export const REQUIRED_KEY_FRAGMENTS = 2;
+const EASY_PRESSURE_SCALE = 0.75;
 
 export function createGameState(seed = Date.now()): GameState {
   const maze = generateMaze(25, 25, seed);
@@ -17,7 +18,7 @@ export function createGameState(seed = Date.now()): GameState {
   );
   const roamingMonsterCells = takeAvailableCells(
     shuffle(candidates.filter((cell) => manhattan(cell, maze.start) > 8), random),
-    17,
+    Math.round(17 * EASY_PRESSURE_SCALE),
     occupied,
   );
   const monsterCells = [...earlyMonsterCells, ...roamingMonsterCells];
@@ -29,8 +30,9 @@ export function createGameState(seed = Date.now()): GameState {
   const chests = chestCells.map((grid, index) => createChest(grid, index, random));
   const monsters = monsterCells.map((grid, index) => createMonster(maze, grid, index, random));
   const startPosition = gridToWorldInMaze(maze, maze.start, CELL_SIZE);
+  const explored = createExploredMap(maze.width, maze.height);
 
-  return {
+  const state: GameState = {
     maze,
     player: {
       position: startPosition,
@@ -45,9 +47,12 @@ export function createGameState(seed = Date.now()): GameState {
     },
     chests,
     monsters,
+    explored,
     status: "playing",
     message: "Find key fragments, open chests, and reach the exit.",
   };
+  revealAroundPlayer(state);
+  return state;
 }
 
 function takeAvailableCells(cells: GridPoint[], count: number, occupied: Set<string>): GridPoint[] {
@@ -243,7 +248,7 @@ function createMonster(
 ): Monster {
   const kind: MonsterKind = index % 2 === 0 ? "skull" : "zombie";
   const position = gridToWorldInMaze(maze, grid, CELL_SIZE);
-  const maxHp = kind === "skull" ? 70 : 110;
+  const maxHp = Math.round((kind === "skull" ? 70 : 110) * EASY_PRESSURE_SCALE);
   return {
     id: `monster-${index}`,
     kind,
@@ -251,12 +256,34 @@ function createMonster(
     position,
     hp: maxHp,
     maxHp,
-    speed: kind === "skull" ? 2.15 : 1.25,
+    speed: Number(((kind === "skull" ? 2.15 : 1.25) * EASY_PRESSURE_SCALE).toFixed(2)),
     attackCooldown: 0,
     wanderTimer: 0,
     wanderAngle: random() * Math.PI * 2,
+    visualState: "walk",
+    visualStateUntil: 0,
     alive: true,
   };
+}
+
+export function revealAroundPlayer(state: GameState, radius = 3): void {
+  const playerGrid = {
+    x: Math.floor(state.player.position.x / CELL_SIZE + state.maze.width / 2),
+    y: Math.floor(state.player.position.z / CELL_SIZE + state.maze.height / 2),
+  };
+  for (let y = playerGrid.y - radius; y <= playerGrid.y + radius; y += 1) {
+    for (let x = playerGrid.x - radius; x <= playerGrid.x + radius; x += 1) {
+      if (x < 0 || y < 0 || x >= state.maze.width || y >= state.maze.height) continue;
+      const distance = Math.hypot(x - playerGrid.x, y - playerGrid.y);
+      if (distance <= radius) {
+        state.explored[y][x] = true;
+      }
+    }
+  }
+}
+
+function createExploredMap(width: number, height: number): boolean[][] {
+  return Array.from({ length: height }, () => Array.from({ length: width }, () => false));
 }
 
 function distance2D(a: { x: number; z: number }, b: { x: number; z: number }): number {

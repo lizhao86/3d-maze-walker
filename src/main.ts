@@ -7,11 +7,13 @@ import {
   damagePlayer,
   getLootLabel,
   openNearestChest,
+  revealAroundPlayer,
 } from "./simulation/gameState";
 import { isWall, worldToGrid } from "./simulation/maze";
 import { getMovementDelta, getYawTowardOpenNeighbor } from "./simulation/movement";
-import type { GameState, Monster } from "./simulation/types";
+import type { GameState, Monster, WeaponId } from "./simulation/types";
 import { WEAPONS } from "./simulation/weapons";
+import { applyWeaponAttack } from "./simulation/combat";
 import { createMaterials } from "./render/materials";
 import { buildWorld, pulseMuzzle, syncWorldMeshes, type WorldMeshes } from "./render/world";
 import { createHud } from "./ui/hud";
@@ -25,17 +27,24 @@ declare global {
       getPlayerPosition: () => { x: number; z: number };
       getStatus: () => GameState["status"];
       getMonsterStats: () => { count: number; nearestDistance: number };
+      setupKnifeZombieTest: () => { monsterId: string; hp: number; alive: boolean; visualState: Monster["visualState"] };
+      setupAssetSheetShowcase: (weaponId?: WeaponId) => { weapon: WeaponId; monsters: number };
+      fireWeaponForTest: () => { hp: number; alive: boolean; visualState: Monster["visualState"]; message: string } | null;
     };
   }
 }
 
 let state = createGameState();
 const hud = createHud(app, state);
+let knifeZombieTestMonsterId: string | null = null;
 
 window.__mazeWalkerDebug = {
   getPlayerPosition: () => ({ ...state.player.position }),
   getStatus: () => state.status,
   getMonsterStats: () => getMonsterStats(),
+  setupKnifeZombieTest: () => setupKnifeZombieTest(),
+  setupAssetSheetShowcase: (weaponId?: WeaponId) => setupAssetSheetShowcase(weaponId),
+  fireWeaponForTest: () => fireWeaponForTest(),
 };
 
 const renderer = new THREE.WebGLRenderer({
@@ -78,6 +87,7 @@ let pitch = 0;
 let lastTime = performance.now();
 let fireCooldown = 0;
 let hitFlash = 0;
+const EASY_DAMAGE_SCALE = 0.75;
 
 hud.startOverlay.addEventListener("click", () => {
   hud.canvas.requestPointerLock();
@@ -170,6 +180,7 @@ function updatePlayer(delta: number): void {
     delta,
   });
   movePlayer(move.x, move.z);
+  revealAroundPlayer(state);
 
   camera.position.x = state.player.position.x;
   camera.position.z = state.player.position.z;
@@ -216,8 +227,15 @@ function collides(x: number, z: number, radius: number): boolean {
 }
 
 function updateMonsters(delta: number): void {
+  const now = performance.now() / 1000;
   for (const monster of state.monsters) {
-    if (!monster.alive) continue;
+    if (!monster.alive) {
+      monster.visualState = "dead";
+      continue;
+    }
+    if (monster.visualStateUntil <= now && monster.visualState !== "walk") {
+      monster.visualState = "walk";
+    }
     const dx = state.player.position.x - monster.position.x;
     const dz = state.player.position.z - monster.position.z;
     const distance = Math.hypot(dx, dz);
@@ -239,8 +257,10 @@ function updateMonsters(delta: number): void {
 
     if (distance < 1.45 && monster.attackCooldown <= 0) {
       monster.attackCooldown = monster.kind === "skull" ? 0.8 : 1.25;
+      monster.visualState = "attack";
+      monster.visualStateUntil = now + 0.28;
       hitFlash = 0.16;
-      damagePlayer(state, monster.kind === "skull" ? 11 : 16);
+      damagePlayer(state, Math.round((monster.kind === "skull" ? 11 : 16) * EASY_DAMAGE_SCALE));
     }
   }
 
@@ -279,34 +299,157 @@ function fireWeapon(): void {
   pulseMuzzle(meshes);
 
   const forward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
-  let bestMonster: Monster | null = null;
-  let bestScore = 0;
-  for (const monster of state.monsters) {
-    if (!monster.alive) continue;
-    const toMonster = new THREE.Vector3(
-      monster.position.x - state.player.position.x,
-      0.2,
-      monster.position.z - state.player.position.z,
-    );
-    const distance = toMonster.length();
-    if (distance > weapon.range) continue;
-    const aim = forward.dot(toMonster.normalize());
-    const threshold = weapon.id === "knife" ? 0.58 : weapon.id === "m667" ? 0.82 : 0.94;
-    const score = aim / Math.max(distance, 0.2);
-    if (aim > threshold && score > bestScore) {
-      bestScore = score;
-      bestMonster = monster;
+  const result = applyWeaponAttack({
+    weapon,
+    playerPosition: state.player.position,
+    forward: { x: forward.x, z: forward.z },
+    monsters: state.monsters,
+  });
+
+  if (result) {
+    state.message = `${weapon.shortName} hit ${result.monster.kind.toUpperCase()}`;
+    if (result.killed) {
+      result.monster.visualState = "dead";
+      result.monster.visualStateUntil = Number.POSITIVE_INFINITY;
+      state.message = `${result.monster.kind.toUpperCase()} neutralized`;
+    } else {
+      result.monster.visualState = "hit";
+      result.monster.visualStateUntil = performance.now() / 1000 + 0.22;
     }
+  }
+}
+
+function setupKnifeZombieTest(): { monsterId: string; hp: number; alive: boolean; visualState: Monster["visualState"] } {
+  const testMonster = state.monsters.find((monster) => monster.kind === "zombie") ?? state.monsters[0];
+  knifeZombieTestMonsterId = testMonster.id;
+  for (const monster of state.monsters) {
+    if (monster.id === testMonster.id) continue;
+    monster.position = { x: state.player.position.x + 40, z: state.player.position.z + 40 };
+    monster.grid = worldToGrid(state.maze, monster.position, CELL_SIZE);
+    monster.alive = false;
+    monster.visualState = "dead";
+  }
+  testMonster.position = {
+    x: state.player.position.x,
+    z: state.player.position.z,
+  };
+  testMonster.maxHp = 70;
+  testMonster.hp = 70;
+  testMonster.speed = 0;
+  testMonster.attackCooldown = 999;
+  testMonster.alive = true;
+  testMonster.visualState = "walk";
+  testMonster.visualStateUntil = 0;
+  state.status = "playing";
+  state.player.hp = state.player.maxHp;
+  state.player.selectedWeapon = "knife";
+  yaw = getYawTowardOpenNeighbor(state.maze);
+  pitch = 0;
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, "YXZ")).normalize();
+  testMonster.position = {
+    x: state.player.position.x + forward.x * 2.05,
+    z: state.player.position.z + forward.z * 2.05,
+  };
+  testMonster.grid = worldToGrid(state.maze, testMonster.position, CELL_SIZE);
+  fireCooldown = 0;
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+  camera.position.x = state.player.position.x;
+  camera.position.z = state.player.position.z;
+  state.message = "Knife zombie test ready.";
+  hud.startOverlay.classList.add("hidden");
+  hud.update(state);
+  return {
+    monsterId: testMonster.id,
+    hp: testMonster.hp,
+    alive: testMonster.alive,
+    visualState: testMonster.visualState,
+  };
+}
+
+function fireWeaponForTest(): { hp: number; alive: boolean; visualState: Monster["visualState"]; message: string } | null {
+  fireWeapon();
+  const testMonster = state.monsters.find((monster) => monster.id === knifeZombieTestMonsterId) ?? state.monsters[0];
+  return {
+    hp: testMonster.hp,
+    alive: testMonster.alive,
+    visualState: testMonster.visualState,
+    message: state.message,
+  };
+}
+
+function setupAssetSheetShowcase(weaponId: WeaponId = "knife"): { weapon: WeaponId; monsters: number } {
+  const selectedWeapon = WEAPONS[weaponId] ? weaponId : "knife";
+  const zombie = state.monsters.find((monster) => monster.kind === "zombie");
+  const skull = state.monsters.find((monster) => monster.kind === "skull");
+  const yawToOpen = getYawTowardOpenNeighbor(state.maze);
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, yawToOpen, 0, "YXZ")).normalize();
+  const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, yawToOpen, 0, "YXZ")).normalize();
+  const origin = state.player.position;
+
+  state.status = "playing";
+  state.player.hp = state.player.maxHp;
+  state.player.inventory = Object.keys(WEAPONS) as WeaponId[];
+  state.player.selectedWeapon = selectedWeapon;
+  for (const key of Object.keys(WEAPONS) as WeaponId[]) {
+    state.player.ammo[key] = 99;
+  }
+  yaw = yawToOpen;
+  pitch = 0;
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+  camera.position.x = origin.x;
+  camera.position.z = origin.z;
+
+  let visibleMonsters = 0;
+  for (const monster of state.monsters) {
+    monster.alive = false;
+    monster.visualState = "dead";
+  }
+  if (zombie) {
+    placeMonsterForShowcase(zombie, origin, forward, right, -0.92, 2.55);
+    visibleMonsters += 1;
+  }
+  if (skull) {
+    placeMonsterForShowcase(skull, origin, forward, right, 0.92, 2.75);
+    visibleMonsters += 1;
   }
 
-  if (bestMonster) {
-    bestMonster.hp -= weapon.damage;
-    state.message = `${weapon.shortName} hit ${bestMonster.kind.toUpperCase()}`;
-    if (bestMonster.hp <= 0) {
-      bestMonster.alive = false;
-      state.message = `${bestMonster.kind.toUpperCase()} neutralized`;
-    }
+  const chest = state.chests[0];
+  const chestMesh = chest ? meshes.chests.get(chest.id) : undefined;
+  if (chest && chestMesh) {
+    chest.opened = false;
+    chest.grid = worldToGrid(state.maze, {
+      x: origin.x + forward.x * 2.9 + right.x * -1.95,
+      z: origin.z + forward.z * 2.9 + right.z * -1.95,
+    }, CELL_SIZE);
+    chestMesh.position.set(origin.x + forward.x * 2.9 + right.x * -1.95, 0, origin.z + forward.z * 2.9 + right.z * -1.95);
   }
+
+  meshes.exitDoor.position.set(origin.x + forward.x * 5.1 + right.x * 1.85, 0, origin.z + forward.z * 5.1 + right.z * 1.85);
+  hud.startOverlay.classList.add("hidden");
+  state.message = "Design sheet assets loaded.";
+  hud.update(state);
+  return { weapon: selectedWeapon, monsters: visibleMonsters };
+}
+
+function placeMonsterForShowcase(
+  monster: Monster,
+  origin: { x: number; z: number },
+  forward: THREE.Vector3,
+  right: THREE.Vector3,
+  sideOffset: number,
+  forwardOffset: number,
+): void {
+  monster.position = {
+    x: origin.x + forward.x * forwardOffset + right.x * sideOffset,
+    z: origin.z + forward.z * forwardOffset + right.z * sideOffset,
+  };
+  monster.grid = worldToGrid(state.maze, monster.position, CELL_SIZE);
+  monster.hp = monster.maxHp;
+  monster.speed = 0;
+  monster.attackCooldown = 999;
+  monster.alive = true;
+  monster.visualState = "walk";
+  monster.visualStateUntil = 0;
 }
 
 function restart(): void {

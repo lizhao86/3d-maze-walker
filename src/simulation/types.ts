@@ -52,6 +52,7 @@ export type Chest = {
 };
 
 export type MonsterKind = "skull" | "zombie";
+export type MonsterVisualState = "walk" | "hit" | "attack" | "dead";
 
 export type Monster = {
   id: string;
@@ -64,6 +65,8 @@ export type Monster = {
   attackCooldown: number;
   wanderTimer: number;
   wanderAngle: number;
+  visualState: MonsterVisualState;
+  visualStateUntil: number;
   alive: boolean;
 };
 
@@ -82,6 +85,7 @@ export type GameState = {
   };
   chests: Chest[];
   monsters: Monster[];
+  explored: boolean[][];
   status: GameStatus;
   message: string;
 };

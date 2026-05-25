@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { CELL_SIZE, REQUIRED_KEY_FRAGMENTS } from "../simulation/gameState";
 import { gridToWorldInMaze } from "../simulation/maze";
-import type { Chest, GameState, Monster } from "../simulation/types";
+import type { Chest, GameState, Monster, WeaponId } from "../simulation/types";
 import { WEAPONS } from "../simulation/weapons";
 import type { GameMaterials } from "./materials";
+import { createMonsterAnimations, createPropArt, createWeaponArt, type MonsterSpriteAnimations } from "./spriteArt";
 
 export type WorldMeshes = {
   root: THREE.Group;
   chests: Map<string, THREE.Group>;
   monsters: Map<string, THREE.Group>;
-  exitDoor: THREE.Mesh;
+  exitDoor: THREE.Group;
   weaponRig: THREE.Group;
   muzzleLight: THREE.PointLight;
 };
@@ -56,11 +57,11 @@ export function syncWorldMeshes(meshes: WorldMeshes, state: GameState, time: num
   for (const chest of state.chests) {
     const mesh = meshes.chests.get(chest.id);
     if (!mesh) continue;
-    const lid = mesh.getObjectByName("lid");
+    const sprite = mesh.getObjectByName("chestSprite") as THREE.Sprite | undefined;
     const glow = mesh.getObjectByName("glow") as THREE.PointLight | undefined;
-    if (lid) {
-      lid.rotation.x = chest.opened ? -0.9 : 0;
-      lid.position.y = chest.opened ? 0.72 : 0.58;
+    if (sprite) {
+      sprite.material.opacity = chest.opened ? 0.62 : 1;
+      sprite.scale.setScalar(chest.opened ? 0.92 : 1);
     }
     if (glow) {
       glow.intensity = chest.opened ? 1.4 + Math.sin(time * 5) * 0.25 : 0.5;
@@ -70,31 +71,63 @@ export function syncWorldMeshes(meshes: WorldMeshes, state: GameState, time: num
   for (const monster of state.monsters) {
     const mesh = meshes.monsters.get(monster.id);
     if (!mesh) continue;
-    mesh.visible = monster.alive;
+    const sprite = mesh.getObjectByName("monsterSprite") as THREE.Sprite | undefined;
+    mesh.visible = true;
     mesh.position.set(monster.position.x, 0, monster.position.z);
-    mesh.rotation.y += monster.kind === "skull" ? 0.02 : 0.008;
-    mesh.position.y = monster.kind === "skull" ? 0.25 + Math.sin(time * 4) * 0.08 : 0;
+    mesh.position.y = monster.alive && monster.kind === "skull" ? 0.25 + Math.sin(time * 4) * 0.08 : 0;
+    if (sprite) {
+      const animations = mesh.userData.animations as MonsterSpriteAnimations | undefined;
+      const frames = animations?.[monster.visualState] ?? animations?.walk;
+      if (frames && frames.length > 0) {
+        const frameRate =
+          monster.visualState === "attack" ? 12 :
+          monster.visualState === "hit" ? 14 :
+          monster.visualState === "dead" ? 1 :
+          monster.kind === "skull" ? 8 : 6;
+        const frameIndex = Math.floor(time * frameRate + mesh.userData.frameOffset) % frames.length;
+        (sprite.material as THREE.SpriteMaterial).map = frames[frameIndex];
+      }
+      const pulse = monster.visualState === "dead"
+        ? 1
+        : 1 + Math.sin(time * (monster.kind === "skull" ? 5 : 3.5) + mesh.userData.frameOffset) * 0.035;
+      const width = monster.visualState === "dead" ? (monster.kind === "skull" ? 2.05 : 2.55) : (monster.kind === "skull" ? 1.65 : 1.52);
+      const height = monster.visualState === "dead" ? (monster.kind === "skull" ? 0.96 : 1.2) : (monster.kind === "skull" ? 2.28 : 2.24);
+      sprite.position.y = monster.visualState === "dead" ? (monster.kind === "skull" ? 0.28 : 0.42) : monster.kind === "skull" ? 1.15 : 1.22;
+      sprite.scale.set(width * pulse, height / pulse, 1);
+      const marker = mesh.getObjectByName("monsterMarker");
+      if (marker) marker.visible = monster.alive;
+      const light = mesh.getObjectByName("monsterLight") as THREE.PointLight | undefined;
+      if (light) light.intensity = monster.alive ? 1.7 : 0.3;
+    }
   }
 
-  const exitMaterial = meshes.exitDoor.material as THREE.MeshStandardMaterial;
+  const exitGlow = meshes.exitDoor.getObjectByName("exitGlow") as THREE.PointLight | undefined;
+  const exitSprite = meshes.exitDoor.getObjectByName("exitSprite") as THREE.Sprite | undefined;
   if (state.player.keyFragments >= REQUIRED_KEY_FRAGMENTS) {
-    exitMaterial.color.set("#203d39");
-    exitMaterial.emissive.set("#54ffc6");
-    exitMaterial.emissiveIntensity = 2 + Math.sin(time * 3) * 0.25;
+    if (exitGlow) exitGlow.intensity = 2 + Math.sin(time * 3) * 0.25;
+    if (exitSprite) exitSprite.material.opacity = 1;
+  } else {
+    if (exitGlow) exitGlow.intensity = 0.7;
+    if (exitSprite) exitSprite.material.opacity = 0.82;
   }
 
   const selected = WEAPONS[state.player.selectedWeapon];
+  const attackUntil = Number(meshes.weaponRig.userData.attackUntil ?? 0);
+  const attackAmount = Math.max(0, Math.min(1, (attackUntil - time) / 0.14));
   meshes.weaponRig.traverse((object) => {
-    if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial) {
-      object.material.emissive.set(selected.color);
-      object.material.emissiveIntensity = object.name === "weaponAccent" ? 1.5 : 0.15;
+    if (object instanceof THREE.Group && typeof object.userData.weaponId === "string") {
+      object.visible = object.userData.weaponId === selected.id;
     }
   });
-  meshes.weaponRig.position.y = -0.04 + Math.sin(time * 2.4) * 0.01;
+  meshes.weaponRig.position.x = 0.48 + attackAmount * (selected.id === "knife" ? -0.18 : 0.06);
+  meshes.weaponRig.position.y = -0.56 + Math.sin(time * 2.4) * 0.012 + attackAmount * (selected.id === "knife" ? 0.12 : -0.04);
+  meshes.weaponRig.rotation.z = selected.id === "knife" ? -attackAmount * 0.34 : attackAmount * 0.08;
+  meshes.weaponRig.rotation.x = selected.id === "knife" ? attackAmount * 0.18 : -attackAmount * 0.08;
 }
 
 export function pulseMuzzle(meshes: WorldMeshes): void {
   meshes.muzzleLight.intensity = 3.2;
+  meshes.weaponRig.userData.attackUntil = performance.now() / 1000 + 0.14;
   window.setTimeout(() => {
     meshes.muzzleLight.intensity = 0;
   }, 55);
@@ -138,19 +171,17 @@ function createChestMesh(chest: Chest, state: GameState, materials: GameMaterial
   const position = gridToWorldInMaze(state.maze, chest.grid, CELL_SIZE);
   group.position.set(position.x, 0, position.z);
 
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.7, 0.85), materials.chest);
-  base.position.y = 0.35;
-  group.add(base);
-
-  const lid = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.24, 0.9), materials.chestOpen);
-  lid.name = "lid";
-  lid.position.y = 0.58;
-  lid.position.z = -0.04;
-  group.add(lid);
-
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.08, 0.96), materials.neonCyan);
-  trim.position.y = 0.74;
-  group.add(trim);
+  const art = createPropArt("chest");
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: art.texture,
+    transparent: true,
+    depthWrite: false,
+    alphaTest: 0.08,
+  }));
+  sprite.name = "chestSprite";
+  sprite.position.y = art.offsetY;
+  sprite.scale.set(art.width, art.height, 1);
+  group.add(sprite);
 
   const glow = new THREE.PointLight("#19f6ff", 0.5, 4);
   glow.name = "glow";
@@ -162,27 +193,23 @@ function createChestMesh(chest: Chest, state: GameState, materials: GameMaterial
 function createMonsterMesh(monster: Monster, materials: GameMaterials): THREE.Group {
   const group = new THREE.Group();
   group.position.set(monster.position.x, 0, monster.position.z);
+  group.userData.animations = createMonsterAnimations(monster.kind);
+  group.userData.frameOffset = Math.random() * 10;
 
-  if (monster.kind === "skull") {
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 18, 14), materials.skull);
-    head.position.y = 1.05;
-    group.add(head);
-    const eyeMaterial = new THREE.MeshStandardMaterial({ color: "#03070b", emissive: "#ff35cb", emissiveIntensity: 2 });
-    const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.04), eyeMaterial);
-    const rightEye = leftEye.clone();
-    leftEye.position.set(-0.16, 1.08, -0.42);
-    rightEye.position.set(0.16, 1.08, -0.42);
-    group.add(leftEye, rightEye);
-  } else {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.8, 8, 16), materials.zombie);
-    body.position.y = 0.9;
-    group.add(body);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.06), materials.neonMagenta);
-    visor.position.set(0, 1.25, -0.32);
-    group.add(visor);
-  }
+  const animations = group.userData.animations as MonsterSpriteAnimations;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: animations.walk[0],
+    transparent: true,
+    depthWrite: false,
+    alphaTest: 0.44,
+  }));
+  sprite.name = "monsterSprite";
+  sprite.position.y = monster.kind === "skull" ? 1.15 : 1.22;
+  sprite.scale.set(monster.kind === "skull" ? 1.65 : 1.52, monster.kind === "skull" ? 2.28 : 2.24, 1);
+  group.add(sprite);
 
   const light = new THREE.PointLight(monster.kind === "skull" ? "#58f6ff" : "#5eff92", 1.7, 8);
+  light.name = "monsterLight";
   light.position.y = 1.2;
   group.add(light);
   const marker = new THREE.Mesh(
@@ -194,56 +221,66 @@ function createMonsterMesh(monster: Monster, materials: GameMaterials): THREE.Gr
       side: THREE.DoubleSide,
     }),
   );
+  marker.name = "monsterMarker";
   marker.rotation.x = -Math.PI / 2;
   marker.position.y = 0.03;
   group.add(marker);
   return group;
 }
 
-function createExitDoor(state: GameState, materials: GameMaterials): THREE.Mesh {
+function createExitDoor(state: GameState, materials: GameMaterials): THREE.Group {
+  const group = new THREE.Group();
   const position = gridToWorldInMaze(state.maze, state.maze.exit, CELL_SIZE);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.8, 0.28), materials.exitLocked);
-  door.position.set(position.x, 1.4, position.z);
-  return door;
+  group.position.set(position.x, 0, position.z);
+
+  const art = createPropArt("exit");
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: art.texture,
+    transparent: true,
+    depthWrite: false,
+    alphaTest: 0.08,
+    opacity: 0.82,
+  }));
+  sprite.name = "exitSprite";
+  sprite.position.y = art.offsetY;
+  sprite.scale.set(art.width, art.height, 1);
+  group.add(sprite);
+
+  const glow = new THREE.PointLight("#54ffc6", 0.7, 7);
+  glow.name = "exitGlow";
+  glow.position.y = 1.8;
+  group.add(glow);
+  return group;
 }
 
 function createWeaponRig(state: GameState): THREE.Group {
   const group = new THREE.Group();
-  group.position.set(0.64, -0.64, -1.55);
-  group.rotation.set(-0.08, -0.22, 0.03);
-  group.scale.setScalar(0.44);
+  group.position.set(0.48, -0.56, -1.22);
+  group.rotation.set(0, 0, 0);
 
-  const selected = WEAPONS[state.player.selectedWeapon];
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: "#151a20",
-    emissive: selected.color,
-    emissiveIntensity: 0.16,
-    roughness: 0.42,
-    metalness: 0.8,
-  });
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: selected.color,
-    emissive: selected.color,
-    emissiveIntensity: 1.5,
-  });
+  for (const weaponId of Object.keys(WEAPONS) as WeaponId[]) {
+    const model = createWeaponSprite(weaponId);
+    model.userData.weaponId = weaponId;
+    model.visible = weaponId === state.player.selectedWeapon;
+    group.add(model);
+  }
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.22, 0.9), bodyMaterial);
-  body.position.set(0, 0, -0.2);
-  group.add(body);
+  return group;
+}
 
-  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.13, 0.82), bodyMaterial);
-  barrel.position.set(0.06, 0.04, -0.96);
-  group.add(barrel);
-
-  const accent = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.035, 0.08), accentMaterial);
-  accent.name = "weaponAccent";
-  accent.position.set(0, 0.14, -0.23);
-  group.add(accent);
-
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.42, 0.18), bodyMaterial);
-  grip.position.set(-0.17, -0.28, 0.08);
-  grip.rotation.x = -0.34;
-  group.add(grip);
-
+function createWeaponSprite(weaponId: WeaponId): THREE.Group {
+  const group = new THREE.Group();
+  const art = createWeaponArt(weaponId);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: art.texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    alphaTest: 0.04,
+  }));
+  sprite.renderOrder = 20;
+  sprite.position.set(art.offsetX, art.offsetY, 0);
+  sprite.scale.set(art.width, art.height, 1);
+  group.add(sprite);
   return group;
 }
