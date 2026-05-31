@@ -51,6 +51,13 @@ export type Chest = {
   loot: ChestLoot;
 };
 
+export type WeaponPickup = {
+  id: string;
+  weaponId: WeaponId;
+  grid: GridPoint;
+  collected: boolean;
+};
+
 export type MonsterKind = "skull" | "zombie";
 export type MonsterVisualState = "walk" | "hit" | "attack" | "dead";
 
@@ -84,6 +91,7 @@ export type GameState = {
     keyFragments: number;
   };
   chests: Chest[];
+  weaponPickups: WeaponPickup[];
   monsters: Monster[];
   explored: boolean[][];
   status: GameStatus;

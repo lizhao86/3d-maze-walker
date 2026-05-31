@@ -1,0 +1,733 @@
+[
+  {
+    "file": "public/assets/sprites-ai/weapons/knife-idle.png",
+    "group": "Weapon",
+    "id": "knife",
+    "state": "idle",
+    "label": "Tactical knife",
+    "use": "First-person idle/ready pose",
+    "width": 208,
+    "height": 141,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/knife-attack.png",
+    "group": "Weapon",
+    "id": "knife",
+    "state": "attack",
+    "label": "Tactical knife",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 291,
+    "height": 149,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 0,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/knife-side.png",
+    "group": "Weapon",
+    "id": "knife",
+    "state": "side",
+    "label": "Tactical knife",
+    "use": "Side-view pickup and HUD icon",
+    "width": 297,
+    "height": 69,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 0,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m9-idle.png",
+    "group": "Weapon",
+    "id": "m9",
+    "state": "idle",
+    "label": "M9 pistol",
+    "use": "First-person idle/ready pose",
+    "width": 137,
+    "height": 128,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 145,
+      "width": 512,
+      "height": 140
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m9-attack.png",
+    "group": "Weapon",
+    "id": "m9",
+    "state": "attack",
+    "label": "M9 pistol",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 279,
+    "height": 146,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 164,
+      "width": 512,
+      "height": 121
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m9-side.png",
+    "group": "Weapon",
+    "id": "m9",
+    "state": "side",
+    "label": "M9 pistol",
+    "use": "Side-view pickup and HUD icon",
+    "width": 189,
+    "height": 132,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 145,
+      "width": 512,
+      "height": 140
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/glock29-idle.png",
+    "group": "Weapon",
+    "id": "glock29",
+    "state": "idle",
+    "label": "Glock 29 pistol",
+    "use": "First-person idle/ready pose",
+    "width": 132,
+    "height": 120,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 316,
+      "width": 512,
+      "height": 108
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/glock29-attack.png",
+    "group": "Weapon",
+    "id": "glock29",
+    "state": "attack",
+    "label": "Glock 29 pistol",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 252,
+    "height": 134,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 300,
+      "width": 512,
+      "height": 124
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/glock29-side.png",
+    "group": "Weapon",
+    "id": "glock29",
+    "state": "side",
+    "label": "Glock 29 pistol",
+    "use": "Side-view pickup and HUD icon",
+    "width": 179,
+    "height": 121,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 316,
+      "width": 512,
+      "height": 108
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/scarlm-idle.png",
+    "group": "Weapon",
+    "id": "scarlm",
+    "state": "idle",
+    "label": "SCAR-LM rifle",
+    "use": "First-person idle/ready pose",
+    "width": 280,
+    "height": 128,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 432,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/scarlm-attack.png",
+    "group": "Weapon",
+    "id": "scarlm",
+    "state": "attack",
+    "label": "SCAR-LM rifle",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 285,
+    "height": 138,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 432,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/scarlm-side.png",
+    "group": "Weapon",
+    "id": "scarlm",
+    "state": "side",
+    "label": "SCAR-LM rifle",
+    "use": "Side-view pickup and HUD icon",
+    "width": 367,
+    "height": 127,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 432,
+      "width": 512,
+      "height": 135
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m134-idle.png",
+    "group": "Weapon",
+    "id": "m134",
+    "state": "idle",
+    "label": "9M 134 minigun",
+    "use": "First-person idle/ready pose",
+    "width": 274,
+    "height": 133,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 578,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m134-attack.png",
+    "group": "Weapon",
+    "id": "m134",
+    "state": "attack",
+    "label": "9M 134 minigun",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 316,
+    "height": 157,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 578,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m134-side.png",
+    "group": "Weapon",
+    "id": "m134",
+    "state": "side",
+    "label": "9M 134 minigun",
+    "use": "Side-view pickup and HUD icon",
+    "width": 350,
+    "height": 134,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 578,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m667-idle.png",
+    "group": "Weapon",
+    "id": "m667",
+    "state": "idle",
+    "label": "M667 sci-fi shotgun",
+    "use": "First-person idle/ready pose",
+    "width": 268,
+    "height": 149,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 722,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m667-attack.png",
+    "group": "Weapon",
+    "id": "m667",
+    "state": "attack",
+    "label": "M667 sci-fi shotgun",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 342,
+    "height": 163,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 722,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/m667-side.png",
+    "group": "Weapon",
+    "id": "m667",
+    "state": "side",
+    "label": "M667 sci-fi shotgun",
+    "use": "Side-view pickup and HUD icon",
+    "width": 353,
+    "height": 131,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 722,
+      "width": 512,
+      "height": 138
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/barrett-idle.png",
+    "group": "Weapon",
+    "id": "barrett",
+    "state": "idle",
+    "label": "Barrett M82A1 sniper",
+    "use": "First-person idle/ready pose",
+    "width": 329,
+    "height": 157,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 0,
+      "y": 874,
+      "width": 512,
+      "height": 150
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/barrett-attack.png",
+    "group": "Weapon",
+    "id": "barrett",
+    "state": "attack",
+    "label": "Barrett M82A1 sniper",
+    "use": "First-person attack pose, includes slash or muzzle effect",
+    "width": 403,
+    "height": 157,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 512,
+      "y": 874,
+      "width": 512,
+      "height": 150
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/weapons/barrett-side.png",
+    "group": "Weapon",
+    "id": "barrett",
+    "state": "side",
+    "label": "Barrett M82A1 sniper",
+    "use": "Side-view pickup and HUD icon",
+    "width": 377,
+    "height": 156,
+    "sourceSheet": "weapons",
+    "sourceRect": {
+      "x": 1024,
+      "y": 874,
+      "width": 512,
+      "height": 150
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-walk-0.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "walk-0",
+    "label": "Cyber zombie",
+    "use": "Walking animation frame 1",
+    "width": 162,
+    "height": 226,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 34,
+      "y": 20,
+      "width": 188,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-walk-1.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "walk-1",
+    "label": "Cyber zombie",
+    "use": "Walking animation frame 2",
+    "width": 161,
+    "height": 226,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 254,
+      "y": 20,
+      "width": 188,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-walk-2.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "walk-2",
+    "label": "Cyber zombie",
+    "use": "Walking animation frame 3",
+    "width": 160,
+    "height": 225,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 430,
+      "y": 20,
+      "width": 230,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-walk-3.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "walk-3",
+    "label": "Cyber zombie",
+    "use": "Walking animation frame 4",
+    "width": 158,
+    "height": 224,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 635,
+      "y": 20,
+      "width": 235,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-hit-0.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "hit-0",
+    "label": "Cyber zombie",
+    "use": "Hit reaction frame 1",
+    "width": 204,
+    "height": 207,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 910,
+      "y": 25,
+      "width": 235,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-hit-1.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "hit-1",
+    "label": "Cyber zombie",
+    "use": "Hit reaction frame 2",
+    "width": 206,
+    "height": 213,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 1162,
+      "y": 25,
+      "width": 250,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-attack-0.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "attack-0",
+    "label": "Cyber zombie",
+    "use": "Attack animation frame 1",
+    "width": 209,
+    "height": 192,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 30,
+      "y": 270,
+      "width": 238,
+      "height": 250
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-attack-1.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "attack-1",
+    "label": "Cyber zombie",
+    "use": "Attack animation frame 2",
+    "width": 241,
+    "height": 195,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 335,
+      "y": 270,
+      "width": 275,
+      "height": 250
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-attack-2.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "attack-2",
+    "label": "Cyber zombie",
+    "use": "Attack animation frame 3",
+    "width": 275,
+    "height": 195,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 630,
+      "y": 270,
+      "width": 270,
+      "height": 250
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/zombie-dead-0.png",
+    "group": "Monster",
+    "id": "zombie",
+    "state": "dead-0",
+    "label": "Cyber zombie",
+    "use": "Dead/lying down frame",
+    "width": 369,
+    "height": 86,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 990,
+      "y": 345,
+      "width": 430,
+      "height": 150
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-walk-0.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "walk-0",
+    "label": "Cyber skull drone",
+    "use": "Hover/walk animation frame 1",
+    "width": 200,
+    "height": 154,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 24,
+      "y": 540,
+      "width": 210,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-walk-1.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "walk-1",
+    "label": "Cyber skull drone",
+    "use": "Hover/walk animation frame 2",
+    "width": 200,
+    "height": 151,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 250,
+      "y": 540,
+      "width": 210,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-walk-2.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "walk-2",
+    "label": "Cyber skull drone",
+    "use": "Hover/walk animation frame 3",
+    "width": 190,
+    "height": 145,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 478,
+      "y": 540,
+      "width": 210,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-walk-3.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "walk-3",
+    "label": "Cyber skull drone",
+    "use": "Hover/walk animation frame 4",
+    "width": 198,
+    "height": 154,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 700,
+      "y": 540,
+      "width": 210,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-hit-0.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "hit-0",
+    "label": "Cyber skull drone",
+    "use": "Hit reaction frame 1",
+    "width": 207,
+    "height": 163,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 910,
+      "y": 540,
+      "width": 235,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-hit-1.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "hit-1",
+    "label": "Cyber skull drone",
+    "use": "Hit reaction frame 2",
+    "width": 220,
+    "height": 166,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 1168,
+      "y": 540,
+      "width": 235,
+      "height": 185
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-attack-0.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "attack-0",
+    "label": "Cyber skull drone",
+    "use": "Attack animation frame 1",
+    "width": 188,
+    "height": 144,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 22,
+      "y": 750,
+      "width": 190,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-attack-1.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "attack-1",
+    "label": "Cyber skull drone",
+    "use": "Attack animation frame 2",
+    "width": 240,
+    "height": 140,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 260,
+      "y": 750,
+      "width": 220,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-attack-2.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "attack-2",
+    "label": "Cyber skull drone",
+    "use": "Attack animation frame 3",
+    "width": 225,
+    "height": 134,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 515,
+      "y": 750,
+      "width": 210,
+      "height": 235
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/monsters/skull-dead-0.png",
+    "group": "Monster",
+    "id": "skull",
+    "state": "dead-0",
+    "label": "Cyber skull drone",
+    "use": "Broken/dead frame",
+    "width": 171,
+    "height": 154,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 745,
+      "y": 760,
+      "width": 160,
+      "height": 225
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/props/chest.png",
+    "group": "Prop",
+    "id": "chest",
+    "state": "single",
+    "label": "Loot chest",
+    "use": "Chest object in the maze",
+    "width": 245,
+    "height": 161,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 900,
+      "y": 760,
+      "width": 285,
+      "height": 220
+    }
+  },
+  {
+    "file": "public/assets/sprites-ai/props/exit.png",
+    "group": "Prop",
+    "id": "exit",
+    "state": "single",
+    "label": "Exit portal",
+    "use": "Exit door/portal object in the maze",
+    "width": 346,
+    "height": 289,
+    "sourceSheet": "monsters",
+    "sourceRect": {
+      "x": 1180,
+      "y": 690,
+      "width": 335,
+      "height": 315
+    }
+  }
+]

@@ -1,5 +1,5 @@
 import { generateMaze, gridToWorldInMaze, manhattan, walkableCells } from "./maze";
-import type { Chest, ChestLoot, GameState, GridPoint, Monster, MonsterKind, WeaponId } from "./types";
+import type { Chest, ChestLoot, GameState, GridPoint, Monster, MonsterKind, WeaponId, WeaponPickup } from "./types";
 import { LOOT_WEAPONS } from "./weapons";
 
 export const CELL_SIZE = 4;
@@ -46,6 +46,7 @@ export function createGameState(seed = Date.now()): GameState {
       keyFragments: 0,
     },
     chests,
+    weaponPickups: [],
     monsters,
     explored,
     status: "playing",
@@ -153,8 +154,34 @@ export function openNearestChest(state: GameState): ChestLoot | null {
   }
 
   chest.opened = true;
-  applyLoot(state, chest.loot);
+  if (chest.loot.type === "weapon") {
+    spawnWeaponPickup(state, chest);
+    state.message = `${chest.loot.weaponId.toUpperCase()} dropped. Press E to pick it up.`;
+  } else {
+    applyLoot(state, chest.loot);
+  }
   return chest.loot;
+}
+
+export function pickupNearestWeapon(state: GameState): WeaponPickup | null {
+  const pickup = state.weaponPickups.find((candidate) => {
+    if (candidate.collected) return false;
+    const pickupPosition = gridToWorldInMaze(state.maze, candidate.grid, CELL_SIZE);
+    return distance2D(pickupPosition, state.player.position) < 2.6;
+  });
+
+  if (!pickup) {
+    return null;
+  }
+
+  pickup.collected = true;
+  if (!state.player.inventory.includes(pickup.weaponId)) {
+    state.player.inventory.push(pickup.weaponId);
+  }
+  state.player.ammo[pickup.weaponId] = (state.player.ammo[pickup.weaponId] ?? 0) + 18;
+  state.player.selectedWeapon = pickup.weaponId;
+  state.message = `${pickup.weaponId.toUpperCase()} equipped.`;
+  return pickup;
 }
 
 export function getLootLabel(loot: ChestLoot): string {
@@ -213,15 +240,6 @@ function createLoot(index: number, random: () => number): ChestLoot {
 }
 
 function applyLoot(state: GameState, loot: ChestLoot): void {
-  if (loot.type === "weapon") {
-    if (!state.player.inventory.includes(loot.weaponId)) {
-      state.player.inventory.push(loot.weaponId);
-    }
-    state.player.ammo[loot.weaponId] = (state.player.ammo[loot.weaponId] ?? 0) + 18;
-    state.player.selectedWeapon = loot.weaponId;
-    state.message = getLootLabel(loot);
-    return;
-  }
   if (loot.type === "ammo") {
     for (const weapon of state.player.inventory) {
       if (weapon !== "knife") {
@@ -236,8 +254,27 @@ function applyLoot(state: GameState, loot: ChestLoot): void {
     state.message = getLootLabel(loot);
     return;
   }
-  state.player.keyFragments += loot.amount;
-  state.message = `Key fragment acquired: ${state.player.keyFragments}/${REQUIRED_KEY_FRAGMENTS}`;
+  if (loot.type === "key") {
+    state.player.keyFragments += loot.amount;
+    state.message = `Key fragment acquired: ${state.player.keyFragments}/${REQUIRED_KEY_FRAGMENTS}`;
+  }
+}
+
+function spawnWeaponPickup(state: GameState, chest: Chest): void {
+  if (chest.loot.type !== "weapon") return;
+  const existing = state.weaponPickups.find((pickup) => pickup.id === `${chest.id}-weapon`);
+  if (existing) {
+    existing.collected = false;
+    existing.weaponId = chest.loot.weaponId;
+    existing.grid = chest.grid;
+    return;
+  }
+  state.weaponPickups.push({
+    id: `${chest.id}-weapon`,
+    weaponId: chest.loot.weaponId,
+    grid: chest.grid,
+    collected: false,
+  });
 }
 
 function createMonster(

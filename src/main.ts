@@ -7,6 +7,7 @@ import {
   damagePlayer,
   getLootLabel,
   openNearestChest,
+  pickupNearestWeapon,
   revealAroundPlayer,
 } from "./simulation/gameState";
 import { isWall, worldToGrid } from "./simulation/maze";
@@ -29,7 +30,9 @@ declare global {
       getMonsterStats: () => { count: number; nearestDistance: number };
       setupKnifeZombieTest: () => { monsterId: string; hp: number; alive: boolean; visualState: Monster["visualState"] };
       setupAssetSheetShowcase: (weaponId?: WeaponId) => { weapon: WeaponId; monsters: number };
+      setupWeaponPickupTest: (weaponId?: WeaponId) => { weapon: WeaponId; pickups: number };
       fireWeaponForTest: () => { hp: number; alive: boolean; visualState: Monster["visualState"]; message: string } | null;
+      getWeaponVisualDebug: () => { weapon: WeaponId; idleOpacity: number; attackOpacity: number; effectOpacity: number; attackUntil: number };
     };
   }
 }
@@ -44,7 +47,9 @@ window.__mazeWalkerDebug = {
   getMonsterStats: () => getMonsterStats(),
   setupKnifeZombieTest: () => setupKnifeZombieTest(),
   setupAssetSheetShowcase: (weaponId?: WeaponId) => setupAssetSheetShowcase(weaponId),
+  setupWeaponPickupTest: (weaponId?: WeaponId) => setupWeaponPickupTest(weaponId),
   fireWeaponForTest: () => fireWeaponForTest(),
+  getWeaponVisualDebug: () => getWeaponVisualDebug(),
 };
 
 const renderer = new THREE.WebGLRenderer({
@@ -107,8 +112,9 @@ document.addEventListener("mousemove", (event) => {
 document.addEventListener("keydown", (event) => {
   keys.add(event.code);
   if (event.code === "KeyE") {
-    const loot = openNearestChest(state);
-    if (loot) {
+    const pickup = pickupNearestWeapon(state);
+    const loot = pickup ? null : openNearestChest(state);
+    if (loot && loot.type !== "weapon") {
       state.message = getLootLabel(loot);
     }
     checkExit(state);
@@ -193,12 +199,28 @@ function updatePlayer(delta: number): void {
     };
     return Math.hypot(chestWorld.x - state.player.position.x, chestWorld.z - state.player.position.z) < 2.6;
   });
+  const nearWeaponPickup = state.weaponPickups.some((pickup) => {
+    if (pickup.collected) return false;
+    const pickupWorld = {
+      x: (pickup.grid.x - state.maze.width / 2 + 0.5) * CELL_SIZE,
+      z: (pickup.grid.y - state.maze.height / 2 + 0.5) * CELL_SIZE,
+    };
+    return Math.hypot(pickupWorld.x - state.player.position.x, pickupWorld.z - state.player.position.z) < 2.6;
+  });
   const exitWorld = {
     x: (state.maze.exit.x - state.maze.width / 2 + 0.5) * CELL_SIZE,
     z: (state.maze.exit.y - state.maze.height / 2 + 0.5) * CELL_SIZE,
   };
   const nearExit = Math.hypot(exitWorld.x - state.player.position.x, exitWorld.z - state.player.position.z) < 2.8;
-  hud.setPrompt(nearChest ? "Press E to open cyber chest" : nearExit ? "Press E to access exit door" : "");
+  hud.setPrompt(
+    nearWeaponPickup
+      ? "Press E to pick up weapon"
+      : nearChest
+        ? "Press E to open cyber chest"
+        : nearExit
+          ? "Press E to access exit door"
+          : "",
+  );
 }
 
 function movePlayer(dx: number, dz: number): void {
@@ -297,6 +319,7 @@ function fireWeapon(): void {
     state.player.ammo[weapon.id] = ammo - weapon.ammoCost;
   }
   pulseMuzzle(meshes);
+  hud.showAttackFlash(weapon.id);
 
   const forward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
   const result = applyWeaponAttack({
@@ -377,6 +400,19 @@ function fireWeaponForTest(): { hp: number; alive: boolean; visualState: Monster
   };
 }
 
+function getWeaponVisualDebug(): { weapon: WeaponId; idleOpacity: number; attackOpacity: number; effectOpacity: number; attackUntil: number } {
+  const selectedGroup = meshes.weaponRig.children.find((child) => child.userData.weaponId === state.player.selectedWeapon) as THREE.Group | undefined;
+  const idleSprite = selectedGroup?.getObjectByName("weaponIdleSprite") as THREE.Sprite | undefined;
+  const attackSprite = selectedGroup?.getObjectByName("weaponAttackSprite") as THREE.Sprite | undefined;
+  return {
+    weapon: state.player.selectedWeapon,
+    idleOpacity: idleSprite ? (idleSprite.material as THREE.SpriteMaterial).opacity : -1,
+    attackOpacity: attackSprite ? (attackSprite.material as THREE.SpriteMaterial).opacity : -1,
+    effectOpacity: 0,
+    attackUntil: Number(meshes.weaponRig.userData.attackUntil ?? 0),
+  };
+}
+
 function setupAssetSheetShowcase(weaponId: WeaponId = "knife"): { weapon: WeaponId; monsters: number } {
   const selectedWeapon = WEAPONS[weaponId] ? weaponId : "knife";
   const zombie = state.monsters.find((monster) => monster.kind === "zombie");
@@ -429,6 +465,36 @@ function setupAssetSheetShowcase(weaponId: WeaponId = "knife"): { weapon: Weapon
   state.message = "Design sheet assets loaded.";
   hud.update(state);
   return { weapon: selectedWeapon, monsters: visibleMonsters };
+}
+
+function setupWeaponPickupTest(weaponId: WeaponId = "barrett"): { weapon: WeaponId; pickups: number } {
+  const selectedWeapon = WEAPONS[weaponId] ? weaponId : "barrett";
+  const yawToOpen = getYawTowardOpenNeighbor(state.maze);
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, yawToOpen, 0, "YXZ")).normalize();
+  const origin = state.player.position;
+  const pickupWorld = {
+    x: origin.x + forward.x * 2.1,
+    z: origin.z + forward.z * 2.1,
+  };
+  const pickupGrid = worldToGrid(state.maze, pickupWorld, CELL_SIZE);
+
+  state.status = "playing";
+  state.player.hp = state.player.maxHp;
+  state.weaponPickups = [{
+    id: "debug-weapon-pickup",
+    weaponId: selectedWeapon,
+    grid: pickupGrid,
+    collected: false,
+  }];
+  yaw = yawToOpen;
+  pitch = 0;
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+  camera.position.x = origin.x;
+  camera.position.z = origin.z;
+  hud.startOverlay.classList.add("hidden");
+  state.message = `${selectedWeapon.toUpperCase()} pickup test ready.`;
+  hud.update(state);
+  return { weapon: selectedWeapon, pickups: state.weaponPickups.length };
 }
 
 function placeMonsterForShowcase(
