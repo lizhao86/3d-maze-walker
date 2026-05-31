@@ -1,14 +1,15 @@
 import * as THREE from "three";
 import { CELL_SIZE, REQUIRED_KEY_FRAGMENTS } from "../simulation/gameState";
 import { gridToWorldInMaze } from "../simulation/maze";
-import type { Chest, GameState, Monster, WeaponId } from "../simulation/types";
+import type { Chest, GameState, Monster, WeaponId, WeaponPickup } from "../simulation/types";
 import { WEAPONS } from "../simulation/weapons";
 import type { GameMaterials } from "./materials";
-import { createMonsterAnimations, createPropArt, createWeaponArt, type MonsterSpriteAnimations } from "./spriteArt";
+import { createMonsterAnimations, createPropArt, createWeaponArt, createWeaponPickupArt, type MonsterSpriteAnimations } from "./spriteArt";
 
 export type WorldMeshes = {
   root: THREE.Group;
   chests: Map<string, THREE.Group>;
+  weaponPickups: Map<string, THREE.Group>;
   monsters: Map<string, THREE.Group>;
   exitDoor: THREE.Group;
   weaponRig: THREE.Group;
@@ -26,6 +27,13 @@ export function buildWorld(scene: THREE.Scene, state: GameState, materials: Game
     const chestGroup = createChestMesh(chest, state, materials);
     chests.set(chest.id, chestGroup);
     root.add(chestGroup);
+  }
+
+  const weaponPickups = new Map<string, THREE.Group>();
+  for (const pickup of state.weaponPickups) {
+    const pickupGroup = createWeaponPickupMesh(pickup, state);
+    weaponPickups.set(pickup.id, pickupGroup);
+    root.add(pickupGroup);
   }
 
   const monsters = new Map<string, THREE.Group>();
@@ -46,6 +54,7 @@ export function buildWorld(scene: THREE.Scene, state: GameState, materials: Game
   return {
     root,
     chests,
+    weaponPickups,
     monsters,
     exitDoor,
     weaponRig,
@@ -101,6 +110,25 @@ export function syncWorldMeshes(meshes: WorldMeshes, state: GameState, time: num
     }
   }
 
+  for (const pickup of state.weaponPickups) {
+    let mesh = meshes.weaponPickups.get(pickup.id);
+    if (!mesh) {
+      mesh = createWeaponPickupMesh(pickup, state);
+      meshes.weaponPickups.set(pickup.id, mesh);
+      meshes.root.add(mesh);
+    }
+    const pickupPosition = gridToWorldInMaze(state.maze, pickup.grid, CELL_SIZE);
+    mesh.position.set(pickupPosition.x, 0, pickupPosition.z);
+    mesh.visible = !pickup.collected;
+    const sprite = mesh.getObjectByName("weaponPickupSprite") as THREE.Sprite | undefined;
+    if (sprite) {
+      sprite.position.y = Number(sprite.userData.baseY ?? 0.86) + Math.sin(time * 4.2 + mesh.userData.frameOffset) * 0.08;
+      sprite.rotation.z = Math.sin(time * 3 + mesh.userData.frameOffset) * 0.035;
+    }
+    const glow = mesh.getObjectByName("pickupGlow") as THREE.PointLight | undefined;
+    if (glow) glow.intensity = pickup.collected ? 0 : 1.7 + Math.sin(time * 5.5) * 0.35;
+  }
+
   const exitGlow = meshes.exitDoor.getObjectByName("exitGlow") as THREE.PointLight | undefined;
   const exitSprite = meshes.exitDoor.getObjectByName("exitSprite") as THREE.Sprite | undefined;
   if (state.player.keyFragments >= REQUIRED_KEY_FRAGMENTS) {
@@ -113,10 +141,17 @@ export function syncWorldMeshes(meshes: WorldMeshes, state: GameState, time: num
 
   const selected = WEAPONS[state.player.selectedWeapon];
   const attackUntil = Number(meshes.weaponRig.userData.attackUntil ?? 0);
-  const attackAmount = Math.max(0, Math.min(1, (attackUntil - time) / 0.14));
+  const attackAmount = Math.max(0, Math.min(1, (attackUntil - time) / 0.42));
   meshes.weaponRig.traverse((object) => {
     if (object instanceof THREE.Group && typeof object.userData.weaponId === "string") {
       object.visible = object.userData.weaponId === selected.id;
+      const idleSprite = object.getObjectByName("weaponIdleSprite") as THREE.Sprite | undefined;
+      const attackSprite = object.getObjectByName("weaponAttackSprite") as THREE.Sprite | undefined;
+      if (idleSprite && attackSprite) {
+        const attackVisible = attackAmount > 0.02;
+        (idleSprite.material as THREE.SpriteMaterial).opacity = attackVisible ? 0 : 1;
+        (attackSprite.material as THREE.SpriteMaterial).opacity = attackVisible ? 1 : 0.001;
+      }
     }
   });
   meshes.weaponRig.position.x = 0.48 + attackAmount * (selected.id === "knife" ? -0.18 : 0.06);
@@ -126,11 +161,24 @@ export function syncWorldMeshes(meshes: WorldMeshes, state: GameState, time: num
 }
 
 export function pulseMuzzle(meshes: WorldMeshes): void {
-  meshes.muzzleLight.intensity = 3.2;
-  meshes.weaponRig.userData.attackUntil = performance.now() / 1000 + 0.14;
+  meshes.muzzleLight.intensity = 0;
+  meshes.weaponRig.userData.attackUntil = performance.now() / 1000 + 0.42;
+  setVisibleWeaponAttackPose(meshes.weaponRig, true);
   window.setTimeout(() => {
     meshes.muzzleLight.intensity = 0;
-  }, 55);
+    setVisibleWeaponAttackPose(meshes.weaponRig, false);
+  }, 420);
+}
+
+function setVisibleWeaponAttackPose(weaponRig: THREE.Group, attacking: boolean): void {
+  weaponRig.traverse((object) => {
+    if (!(object instanceof THREE.Group) || typeof object.userData.weaponId !== "string") return;
+    const idleSprite = object.getObjectByName("weaponIdleSprite") as THREE.Sprite | undefined;
+    const attackSprite = object.getObjectByName("weaponAttackSprite") as THREE.Sprite | undefined;
+    if (!idleSprite || !attackSprite) return;
+    (idleSprite.material as THREE.SpriteMaterial).opacity = attacking ? 0 : 1;
+    (attackSprite.material as THREE.SpriteMaterial).opacity = attacking ? 1 : 0.001;
+  });
 }
 
 function buildFloor(root: THREE.Group, state: GameState, materials: GameMaterials): void {
@@ -253,6 +301,46 @@ function createExitDoor(state: GameState, materials: GameMaterials): THREE.Group
   return group;
 }
 
+function createWeaponPickupMesh(pickup: WeaponPickup, state: GameState): THREE.Group {
+  const group = new THREE.Group();
+  const position = gridToWorldInMaze(state.maze, pickup.grid, CELL_SIZE);
+  group.position.set(position.x, 0, position.z);
+  group.userData.frameOffset = Math.random() * 10;
+
+  const art = createWeaponPickupArt(pickup.weaponId);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: art.texture,
+    transparent: true,
+    depthWrite: false,
+    alphaTest: 0.08,
+  }));
+  sprite.name = "weaponPickupSprite";
+  sprite.userData.baseY = art.offsetY;
+  sprite.position.set(art.offsetX, art.offsetY, 0);
+  sprite.scale.set(art.width, art.height, 1);
+  group.add(sprite);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.62, 0.74, 28),
+    new THREE.MeshBasicMaterial({
+      color: WEAPONS[pickup.weaponId].color,
+      transparent: true,
+      opacity: 0.44,
+      side: THREE.DoubleSide,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.04;
+  group.add(ring);
+
+  const glow = new THREE.PointLight(WEAPONS[pickup.weaponId].color, 1.7, 4.8);
+  glow.name = "pickupGlow";
+  glow.position.y = 0.9;
+  group.add(glow);
+  group.visible = !pickup.collected;
+  return group;
+}
+
 function createWeaponRig(state: GameState): THREE.Group {
   const group = new THREE.Group();
   group.position.set(0.48, -0.56, -1.22);
@@ -270,17 +358,33 @@ function createWeaponRig(state: GameState): THREE.Group {
 
 function createWeaponSprite(weaponId: WeaponId): THREE.Group {
   const group = new THREE.Group();
-  const art = createWeaponArt(weaponId);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: art.texture,
+  const idleArt = createWeaponArt(weaponId, "idle");
+  const attackArt = createWeaponArt(weaponId, "attack");
+  const idleSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: idleArt.texture,
     transparent: true,
     depthTest: false,
     depthWrite: false,
     alphaTest: 0.04,
   }));
-  sprite.renderOrder = 20;
-  sprite.position.set(art.offsetX, art.offsetY, 0);
-  sprite.scale.set(art.width, art.height, 1);
-  group.add(sprite);
+  idleSprite.name = "weaponIdleSprite";
+  idleSprite.renderOrder = 20;
+  idleSprite.position.set(idleArt.offsetX, idleArt.offsetY, 0);
+  idleSprite.scale.set(idleArt.width, idleArt.height, 1);
+  group.add(idleSprite);
+
+  const attackSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: attackArt.texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    alphaTest: 0.04,
+    opacity: 0.001,
+  }));
+  attackSprite.name = "weaponAttackSprite";
+  attackSprite.renderOrder = 21;
+  attackSprite.position.set(attackArt.offsetX, attackArt.offsetY, 0);
+  attackSprite.scale.set(attackArt.width, attackArt.height, 1);
+  group.add(attackSprite);
   return group;
 }

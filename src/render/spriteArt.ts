@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { MonsterKind, MonsterVisualState, WeaponId } from "../simulation/types";
-import { WEAPONS } from "../simulation/weapons";
 
 export type WeaponSpriteArt = {
   texture: THREE.CanvasTexture;
@@ -18,21 +17,12 @@ export type PropSpriteArt = {
   offsetY: number;
 };
 
-type SheetSource = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  destX: number;
-  destY: number;
-  destWidth: number;
-  destHeight: number;
-};
+export type WeaponSpritePose = "idle" | "attack" | "side";
 
-const DESIGN_SHEET_URL = "/assets/maze-walker-design-sheet.png";
-let designSheetImage: HTMLImageElement | null = null;
-let designSheetLoaded = false;
-const pendingDesignSheetPaints: Array<() => void> = [];
+const SPRITE_ASSET_URL = "/assets/sprites-ai";
+const sheetImages = new Map<string, HTMLImageElement>();
+const loadedSheets = new Set<string>();
+const pendingSheetPaints = new Map<string, Array<() => void>>();
 
 export function createMonsterAnimations(kind: MonsterKind): MonsterSpriteAnimations {
   return {
@@ -43,53 +33,38 @@ export function createMonsterAnimations(kind: MonsterKind): MonsterSpriteAnimati
   };
 }
 
-export function createWeaponArt(weaponId: WeaponId): WeaponSpriteArt {
-  return createWeaponDesignSheetArt(weaponId);
+export function createWeaponArt(weaponId: WeaponId, pose: WeaponSpritePose = "idle"): WeaponSpriteArt {
+  return createWeaponAssetArt(weaponId, pose);
+}
+
+export function createWeaponPickupArt(weaponId: WeaponId): WeaponSpriteArt {
+  const texture = createSpriteAssetTexture(getWeaponSpriteUrl(weaponId, "side"), 640, 420);
+  if (weaponId === "knife") {
+    return { texture, width: 2.05, height: 0.58, offsetX: 0, offsetY: 0.82 };
+  }
+  if (weaponId === "m134") {
+    return { texture, width: 2.35, height: 0.78, offsetX: 0, offsetY: 0.86 };
+  }
+  if (weaponId === "scarlm" || weaponId === "barrett" || weaponId === "m667") {
+    return { texture, width: weaponId === "barrett" ? 2.55 : 2.35, height: 0.72, offsetX: 0, offsetY: 0.86 };
+  }
+  return { texture, width: 1.62, height: 0.84, offsetX: 0, offsetY: 0.86 };
 }
 
 export function createPropArt(kind: "chest" | "exit"): PropSpriteArt {
-  const source = kind === "chest"
-    ? { x: 1240, y: 382, width: 236, height: 204, destX: 28, destY: 54, destWidth: 264, destHeight: 230 }
-    : { x: 1202, y: 648, width: 270, height: 312, destX: 20, destY: 18, destWidth: 280, destHeight: 328 };
-  const texture = createDesignSheetTexture(source, 320, 360);
+  const texture = createSpriteAssetTexture(`${SPRITE_ASSET_URL}/props/${kind}.png`, 320, 360);
   return kind === "chest"
     ? { texture, width: 2.05, height: 1.75, offsetY: 0.88 }
     : { texture, width: 3.15, height: 3.65, offsetY: 1.82 };
 }
 
 export function createWeaponIconStyle(weaponId: WeaponId): string {
-  const source = getWeaponSheetSource(weaponId);
-  const scale = 180 / source.width;
-  const sheetWidth = 1536 * scale;
-  const sheetHeight = 1024 * scale;
-  const x = -source.x * scale + (180 - source.width * scale) / 2;
-  const y = -source.y * scale + (118 - source.height * scale) / 2;
-  return `--slot-image:url('${DESIGN_SHEET_URL}'); --slot-position:${x.toFixed(1)}px ${y.toFixed(1)}px; --slot-size:${sheetWidth.toFixed(1)}px ${sheetHeight.toFixed(1)}px`;
-}
-
-export function createWeaponIconDataUrl(weaponId: WeaponId): string {
-  const canvas = createCanvas(180, 118);
-  const context = getContext(canvas);
-  const color = WEAPONS[weaponId].color;
-
-  context.translate(90, 64);
-  context.scale(0.28, 0.28);
-  if (weaponId === "knife") {
-    drawKnife(context, color);
-  } else if (weaponId === "m134") {
-    drawMinigun(context, color);
-  } else if (weaponId === "scarlm" || weaponId === "barrett" || weaponId === "m667") {
-    drawLongGun(context, color, weaponId);
-  } else {
-    drawPistol(context, color, weaponId);
-  }
-
-  return canvas.toDataURL("image/png");
+  return `--slot-image:url('${getWeaponSpriteUrl(weaponId, "side")}'); --slot-position:center; --slot-size:contain`;
 }
 
 function createMonsterFrame(kind: MonsterKind, state: MonsterVisualState, frame: number): THREE.CanvasTexture {
   if (kind === "zombie" || kind === "skull") {
-    return createDesignSheetTexture(getMonsterSheetSource(kind, state, frame), 320, 448);
+    return createSpriteAssetTexture(`${SPRITE_ASSET_URL}/monsters/${kind}-${state}-${frame}.png`, 320, 448);
   }
 
   const canvas = createCanvas(320, 448);
@@ -105,101 +80,73 @@ function createMonsterFrame(kind: MonsterKind, state: MonsterVisualState, frame:
   return createTexture(canvas, 112);
 }
 
-function createDesignSheetTexture(source: SheetSource, canvasWidth: number, canvasHeight: number): THREE.CanvasTexture {
+function getWeaponSpriteUrl(weaponId: WeaponId, pose: WeaponSpritePose): string {
+  return `${SPRITE_ASSET_URL}/weapons/${weaponId}-${pose}.png`;
+}
+
+function createSpriteAssetTexture(url: string, canvasWidth: number, canvasHeight: number): THREE.CanvasTexture {
   const canvas = createCanvas(canvasWidth, canvasHeight);
   const context = getContext(canvas);
   const texture = createTexture(canvas, 0);
   const paint = () => {
-    const image = getDesignSheetImage();
-    if (!image || !designSheetLoaded) return;
+    const image = getSpriteAssetImage(url);
+    if (!image || !loadedSheets.has(url)) return;
 
+    const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
+    const width = image.width * scale;
+    const height = image.height * scale;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(
-      image,
-      source.x,
-      source.y,
-      source.width,
-      source.height,
-      source.destX,
-      source.destY,
-      source.destWidth,
-      source.destHeight,
-    );
-    clearDesignSheetBackground(canvas);
+    context.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
     texture.needsUpdate = true;
   };
 
-  if (designSheetLoaded) {
+  if (loadedSheets.has(url)) {
     paint();
   } else {
-    pendingDesignSheetPaints.push(paint);
-    getDesignSheetImage();
+    const pendingPaints = pendingSheetPaints.get(url) ?? [];
+    pendingPaints.push(paint);
+    pendingSheetPaints.set(url, pendingPaints);
+    getSpriteAssetImage(url);
   }
 
   return texture;
 }
 
-function getDesignSheetImage(): HTMLImageElement | null {
+function getSpriteAssetImage(sheetUrl: string): HTMLImageElement | null {
   if (typeof Image === "undefined") return null;
-  if (designSheetImage) return designSheetImage;
+  const existing = sheetImages.get(sheetUrl);
+  if (existing) return existing;
 
-  designSheetImage = new Image();
-  designSheetImage.onload = () => {
-    designSheetLoaded = true;
-    for (const paint of pendingDesignSheetPaints.splice(0)) {
+  const image = new Image();
+  image.onload = () => {
+    loadedSheets.add(sheetUrl);
+    const pendingPaints = pendingSheetPaints.get(sheetUrl) ?? [];
+    pendingSheetPaints.set(sheetUrl, []);
+    for (const paint of pendingPaints) {
       paint();
     }
   };
-  designSheetImage.src = DESIGN_SHEET_URL;
-  return designSheetImage;
+  image.src = sheetUrl;
+  sheetImages.set(sheetUrl, image);
+  return image;
 }
 
-function getMonsterSheetSource(kind: MonsterKind, state: MonsterVisualState, frame: number): SheetSource {
-  if (kind === "skull") {
-    return getSkullSheetSource(state, frame);
+function createWeaponAssetArt(weaponId: WeaponId, pose: WeaponSpritePose): WeaponSpriteArt {
+  const texture = createSpriteAssetTexture(getWeaponSpriteUrl(weaponId, pose), 640, 420);
+  if (pose === "attack") {
+    if (weaponId === "knife") {
+      return { texture, width: 2.38, height: 1.32, offsetX: -0.02, offsetY: 0.02 };
+    }
+    if (weaponId === "m134") {
+      return { texture, width: 3.18, height: 1.22, offsetX: -0.1, offsetY: 0 };
+    }
+    if (weaponId === "scarlm" || weaponId === "barrett" || weaponId === "m667") {
+      return { texture, width: weaponId === "barrett" ? 3.32 : 3.08, height: 1.2, offsetX: -0.12, offsetY: 0 };
+    }
+    return { texture, width: 2.58, height: 1.18, offsetX: -0.06, offsetY: 0 };
   }
-  return getZombieSheetSource(state, frame);
-}
-
-function getZombieSheetSource(state: MonsterVisualState, frame: number): SheetSource {
-  if (state === "attack") {
-    return { x: 248, y: 100, width: 160, height: 175, destX: 16, destY: 62, destWidth: 288, destHeight: 315 };
-  }
-  if (state === "hit") {
-    return { x: 438, y: 98, width: 128, height: 190, destX: 46, destY: 48, destWidth: 228, destHeight: 338 };
-  }
-  if (state === "dead") {
-    return { x: 584, y: 158, width: 168, height: 112, destX: 24, destY: 198, destWidth: 272, destHeight: 182 };
-  }
-
-  if (frame % 2 === 0) {
-    return { x: 38, y: 102, width: 86, height: 176, destX: 75, destY: 50, destWidth: 170, destHeight: 348 };
-  }
-  return { x: 124, y: 102, width: 98, height: 176, destX: 62, destY: 50, destWidth: 194, destHeight: 348 };
-}
-
-function getSkullSheetSource(state: MonsterVisualState, frame: number): SheetSource {
-  if (state === "attack") {
-    return { x: 990, y: 100, width: 168, height: 178, destX: 10, destY: 62, destWidth: 300, destHeight: 318 };
-  }
-  if (state === "hit") {
-    return { x: 1192, y: 96, width: 142, height: 188, destX: 40, destY: 48, destWidth: 244, destHeight: 338 };
-  }
-  if (state === "dead") {
-    return { x: 1364, y: 176, width: 142, height: 92, destX: 28, destY: 202, destWidth: 264, destHeight: 172 };
-  }
-
-  if (frame % 2 === 0) {
-    return { x: 800, y: 102, width: 88, height: 176, destX: 70, destY: 50, destWidth: 180, destHeight: 348 };
-  }
-  return { x: 898, y: 102, width: 88, height: 176, destX: 70, destY: 50, destWidth: 180, destHeight: 348 };
-}
-
-function createWeaponDesignSheetArt(weaponId: WeaponId): WeaponSpriteArt {
-  const source = getWeaponSheetSource(weaponId);
-  const texture = createDesignSheetTexture(source, 640, 420);
   if (weaponId === "knife") {
-    return { texture, width: 1.95, height: 1.18, offsetX: 0.12, offsetY: -0.04 };
+    return { texture, width: pose === "side" ? 2.05 : 1.95, height: pose === "side" ? 0.62 : 1.18, offsetX: 0.12, offsetY: -0.04 };
   }
   if (weaponId === "m134") {
     return { texture, width: 2.28, height: 1.05, offsetX: 0.08, offsetY: -0.04 };
@@ -210,46 +157,78 @@ function createWeaponDesignSheetArt(weaponId: WeaponId): WeaponSpriteArt {
   return { texture, width: 1.82, height: 1, offsetX: 0.1, offsetY: -0.03 };
 }
 
-function getWeaponSheetSource(weaponId: WeaponId): SheetSource {
-  if (weaponId === "knife") {
-    return { x: 54, y: 382, width: 288, height: 112, destX: 40, destY: 108, destWidth: 560, destHeight: 218 };
-  }
-  if (weaponId === "m9") {
-    return { x: 452, y: 394, width: 230, height: 116, destX: 64, destY: 108, destWidth: 512, destHeight: 228 };
-  }
-  if (weaponId === "glock29") {
-    return { x: 874, y: 392, width: 248, height: 124, destX: 60, destY: 104, destWidth: 520, destHeight: 238 };
-  }
-  if (weaponId === "scarlm") {
-    return { x: 46, y: 606, width: 500, height: 116, destX: 18, destY: 126, destWidth: 604, destHeight: 146 };
-  }
-  if (weaponId === "m134") {
-    return { x: 664, y: 608, width: 466, height: 112, destX: 28, destY: 120, destWidth: 584, destHeight: 158 };
-  }
-  if (weaponId === "m667") {
-    return { x: 52, y: 822, width: 472, height: 114, destX: 24, destY: 120, destWidth: 596, destHeight: 160 };
-  }
-  return { x: 624, y: 822, width: 480, height: 122, destX: 22, destY: 118, destWidth: 598, destHeight: 164 };
+function drawSlashEffect(context: CanvasRenderingContext2D): void {
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.globalCompositeOperation = "source-over";
+  context.shadowBlur = 24;
+  context.shadowColor = "#62f7ff";
+  context.strokeStyle = "rgba(104, 247, 255, 0.95)";
+  context.lineWidth = 18;
+  context.beginPath();
+  context.ellipse(350, 154, 210, 68, -0.22, Math.PI * 0.92, Math.PI * 1.92);
+  context.stroke();
+  context.shadowColor = "#ff4bd8";
+  context.strokeStyle = "rgba(255, 75, 216, 0.86)";
+  context.lineWidth = 9;
+  context.beginPath();
+  context.ellipse(360, 170, 205, 56, -0.22, Math.PI * 0.98, Math.PI * 1.82);
+  context.stroke();
+  context.restore();
 }
 
-function clearDesignSheetBackground(canvas: HTMLCanvasElement): void {
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas 2D context is unavailable.");
+function drawMuzzleEffect(context: CanvasRenderingContext2D, weaponId: WeaponId): void {
+  const origin = getMuzzleEffectOrigin(weaponId);
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  const flashSize = weaponId === "barrett" || weaponId === "m667" ? 180 : weaponId === "m134" ? 160 : 150;
+  const gradient = context.createRadialGradient(origin.x, origin.y, 4, origin.x, origin.y, flashSize);
+  gradient.addColorStop(0, "rgba(255, 255, 235, 1)");
+  gradient.addColorStop(0.25, "rgba(255, 187, 76, 0.95)");
+  gradient.addColorStop(0.62, "rgba(255, 83, 34, 0.5)");
+  gradient.addColorStop(1, "rgba(255, 83, 34, 0)");
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.ellipse(origin.x, origin.y, flashSize * 1.05, flashSize * 0.42, -0.08, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "rgba(255, 225, 92, 0.92)";
+  context.beginPath();
+  context.moveTo(origin.x - flashSize * 0.9, origin.y);
+  context.lineTo(origin.x + flashSize * 0.2, origin.y - flashSize * 0.34);
+  context.lineTo(origin.x + flashSize * 0.55, origin.y);
+  context.lineTo(origin.x + flashSize * 0.2, origin.y + flashSize * 0.34);
+  context.closePath();
+  context.fill();
 
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  for (let index = 0; index < imageData.data.length; index += 4) {
-    const red = imageData.data[index];
-    const green = imageData.data[index + 1];
-    const blue = imageData.data[index + 2];
-    const max = Math.max(red, green, blue);
-    const min = Math.min(red, green, blue);
-    const bluePanelPixel = blue > red + 5 && blue > green + 2 && max < 34;
-    const nearBlackPixel = max < 18;
-    if (nearBlackPixel || bluePanelPixel) {
-      imageData.data[index + 3] = 0;
-    }
+  context.strokeStyle = weaponId === "m667" ? "rgba(91, 245, 255, 0.9)" : "rgba(255, 231, 156, 0.8)";
+  context.lineWidth = 5;
+  context.shadowBlur = 14;
+  context.shadowColor = context.strokeStyle;
+  for (let index = 0; index < 5; index += 1) {
+    const spread = (index - 2) * 0.18;
+    context.beginPath();
+    context.moveTo(origin.x + 18, origin.y);
+    context.lineTo(origin.x - flashSize * 0.78, origin.y + spread * flashSize);
+    context.stroke();
   }
-  context.putImageData(imageData, 0, 0);
+
+  context.fillStyle = "rgba(242, 176, 75, 0.92)";
+  for (let index = 0; index < 3; index += 1) {
+    context.save();
+    context.translate(origin.x + 172 + index * 34, origin.y - 58 - index * 10);
+    context.rotate(-0.34 + index * 0.18);
+    context.fillRect(-16, -5, 32, 10);
+    context.restore();
+  }
+  context.restore();
+}
+
+function getMuzzleEffectOrigin(weaponId: WeaponId): { x: number; y: number } {
+  if (weaponId === "m134") return { x: 360, y: 142 };
+  if (weaponId === "scarlm" || weaponId === "barrett") return { x: 340, y: 138 };
+  if (weaponId === "m667") return { x: 350, y: 150 };
+  return { x: 420, y: 145 };
 }
 
 function drawCyberSkull(context: CanvasRenderingContext2D, state: MonsterVisualState, frame: number): void {

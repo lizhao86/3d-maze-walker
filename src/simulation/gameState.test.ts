@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CELL_SIZE, createGameState, revealAroundPlayer } from "./gameState";
+import { CELL_SIZE, createGameState, openNearestChest, pickupNearestWeapon, revealAroundPlayer } from "./gameState";
 import { manhattan } from "./maze";
 
 describe("createGameState", () => {
@@ -35,6 +35,35 @@ describe("createGameState", () => {
     expect(initialExploredCount).toBeGreaterThan(0);
     expect(initialExploredCount).toBeLessThan(state.maze.width * state.maze.height);
     expect(countExplored(state.explored)).toBeGreaterThan(initialExploredCount);
+  });
+
+  it("spawns weapon loot beside an opened chest until the player picks it up", () => {
+    const state = createGameState(12345);
+    const chest = state.chests[0];
+    chest.grid = state.maze.start;
+    chest.loot = { type: "weapon", weaponId: "barrett" };
+    state.player.inventory = ["knife"];
+    state.player.selectedWeapon = "knife";
+
+    const loot = openNearestChest(state);
+
+    expect(loot).toEqual({ type: "weapon", weaponId: "barrett" });
+    expect(state.player.inventory).toEqual(["knife"]);
+    expect(state.player.selectedWeapon).toBe("knife");
+    expect(state.weaponPickups).toHaveLength(1);
+    expect(state.weaponPickups[0]).toMatchObject({
+      weaponId: "barrett",
+      grid: state.maze.start,
+      collected: false,
+    });
+
+    const pickedUp = pickupNearestWeapon(state);
+
+    expect(pickedUp?.weaponId).toBe("barrett");
+    expect(state.player.inventory).toContain("barrett");
+    expect(state.player.selectedWeapon).toBe("barrett");
+    expect(state.player.ammo.barrett).toBe(18);
+    expect(state.weaponPickups[0].collected).toBe(true);
   });
 });
 

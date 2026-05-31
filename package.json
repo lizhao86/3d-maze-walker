@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
+    "extract:ai-sprites": "node scripts/extract-ai-sprites.mjs",
     "test": "vitest run"
   },
   "dependencies": {

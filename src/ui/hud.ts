@@ -1,4 +1,5 @@
 import type { GameState } from "../simulation/types";
+import type { WeaponId } from "../simulation/types";
 import { WEAPONS } from "../simulation/weapons";
 import { REQUIRED_KEY_FRAGMENTS } from "../simulation/gameState";
 import { createWeaponIconStyle } from "../render/spriteArt";
@@ -29,6 +30,7 @@ export function createHud(container: HTMLElement, state: GameState) {
         <div class="ammo-readout">READY</div>
       </section>
       <section class="hotbar"></section>
+      <div class="attack-flash"></div>
       <div class="prompt"></div>
       <div class="message"></div>
     </div>
@@ -47,12 +49,13 @@ export function createHud(container: HTMLElement, state: GameState) {
   const weaponName = container.querySelector<HTMLElement>(".weapon-name");
   const ammoReadout = container.querySelector<HTMLElement>(".ammo-readout");
   const hotbar = container.querySelector<HTMLElement>(".hotbar");
+  const attackFlash = container.querySelector<HTMLElement>(".attack-flash");
   const prompt = container.querySelector<HTMLElement>(".prompt");
   const message = container.querySelector<HTMLElement>(".message");
   const minimap = container.querySelector<HTMLCanvasElement>(".minimap");
   const startOverlay = container.querySelector<HTMLButtonElement>(".start-overlay");
 
-  if (!canvas || !hpFill || !hpValue || !objectiveCopy || !weaponName || !ammoReadout || !hotbar || !prompt || !message || !minimap || !startOverlay) {
+  if (!canvas || !hpFill || !hpValue || !objectiveCopy || !weaponName || !ammoReadout || !hotbar || !attackFlash || !prompt || !message || !minimap || !startOverlay) {
     throw new Error("HUD failed to initialize.");
   }
 
@@ -66,6 +69,12 @@ export function createHud(container: HTMLElement, state: GameState) {
     setPrompt(copy: string) {
       prompt.textContent = copy;
       prompt.classList.toggle("visible", copy.length > 0);
+    },
+    showAttackFlash(weaponId: WeaponId) {
+      attackFlash.className = `attack-flash ${weaponId === "knife" ? "slash" : "muzzle"} visible`;
+      window.setTimeout(() => {
+        attackFlash.classList.remove("visible");
+      }, weaponId === "knife" ? 220 : 220);
     },
     update(nextState: GameState) {
       const hpPercent = Math.max(0, nextState.player.hp / nextState.player.maxHp);
@@ -125,6 +134,13 @@ function drawMinimap(canvas: HTMLCanvasElement, state: GameState): void {
   for (const chest of state.chests) {
     if (!chest.opened && state.explored[chest.grid.y][chest.grid.x]) {
       context.fillRect(chest.grid.x * scale, chest.grid.y * scale, scale, scale);
+    }
+  }
+
+  context.fillStyle = "#68f7ff";
+  for (const pickup of state.weaponPickups) {
+    if (!pickup.collected && state.explored[pickup.grid.y][pickup.grid.x]) {
+      context.fillRect(pickup.grid.x * scale, pickup.grid.y * scale, scale, scale);
     }
   }
 
